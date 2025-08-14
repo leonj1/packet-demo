@@ -4,11 +4,16 @@ import { useState, useEffect } from 'react';
 import { Zap, Shield, Globe, Database, Server, Cloud, Lock, Cpu } from 'lucide-react';
 import ScenarioSelector from './ScenarioSelector';
 import NavigationControls from './NavigationControls';
+import JwtTokenDisplay from './JwtTokenDisplay';
 import { loadScenario } from '../utils/scenarioLoader';
+import { getTokenSummary } from '../utils/jwtHelpers';
 
 const NetworkCanvas = () => {
+  const HUD_WIDTH = 340; // Width of JWT HUD panel + gap
+  const MIN_CANVAS_WIDTH = 800;
+  
   const [dimensions, setDimensions] = useState({
-    width: window.innerWidth,
+    width: Math.max(window.innerWidth - HUD_WIDTH, MIN_CANVAS_WIDTH),
     height: window.innerHeight - 100
   });
   
@@ -23,6 +28,9 @@ const NetworkCanvas = () => {
   const [scenarioData, setScenarioData] = useState(null);
   const [isLoadingScenario, setIsLoadingScenario] = useState(true);
   const [scenarioError, setScenarioError] = useState(null);
+  const [nodeTokens, setNodeTokens] = useState({});
+  const [packetToken, setPacketToken] = useState(null);
+  const [currentNodeAtPacket, setCurrentNodeAtPacket] = useState(null);
 
   // Icon mapping for scenarios
   const iconMap = {
@@ -44,21 +52,21 @@ const NetworkCanvas = () => {
   useEffect(() => {
     const handleResize = () => {
       setDimensions({
-        width: window.innerWidth,
+        width: Math.max(window.innerWidth - HUD_WIDTH, MIN_CANVAS_WIDTH),
         height: window.innerHeight - 100
       });
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [HUD_WIDTH, MIN_CANVAS_WIDTH]);
 
   // Load initial scenario
   useEffect(() => {
     loadScenarioData(currentScenario);
   }, []);
 
-  // Update packet position when scenario data changes
+  // Update packet position and tokens when scenario data changes
   useEffect(() => {
     if (scenarioData?.nodes && scenarioData.nodes.length > 0) {
       const firstNode = scenarioData.nodes[0];
@@ -66,6 +74,21 @@ const NetworkCanvas = () => {
         x: firstNode.x + firstNode.width / 2, 
         y: firstNode.y + firstNode.height / 2 
       });
+      
+      // Initialize node tokens
+      const tokens = {};
+      scenarioData.nodes.forEach(node => {
+        if (node.token) {
+          tokens[node.id] = node.token;
+        }
+      });
+      setNodeTokens(tokens);
+      
+      // Set initial packet token if first node has one
+      if (firstNode.token) {
+        setPacketToken(firstNode.token);
+        setCurrentNodeAtPacket(firstNode.id);
+      }
     }
   }, [scenarioData]);
 
@@ -89,6 +112,12 @@ const NetworkCanvas = () => {
     const trail = [];
     
     setConnectionGlow(connectionIndex);
+    
+    // Update packet token based on connection
+    const connection = connections[connectionIndex];
+    if (connection?.tokenExchange?.token) {
+      setPacketToken(connection.tokenExchange.token);
+    }
     
     const animate = () => {
       if (step <= steps) {
@@ -117,6 +146,7 @@ const NetworkCanvas = () => {
         setIsAnimating(false);
         setPacketTrail([]);
         setConnectionGlow(-1);
+        setCurrentNodeAtPacket(toNode.id);
       }
     };
     
@@ -130,6 +160,16 @@ const NetworkCanvas = () => {
     const trail = [];
     
     setConnectionGlow(connectionIndex);
+    
+    // When going backward, use the previous connection's token or the origin node's token
+    if (connectionIndex > 0) {
+      const prevConnection = connections[connectionIndex - 1];
+      if (prevConnection?.tokenExchange?.token) {
+        setPacketToken(prevConnection.tokenExchange.token);
+      }
+    } else if (toNode.token) {
+      setPacketToken(toNode.token);
+    }
     
     const animate = () => {
       if (step <= steps) {
@@ -158,6 +198,7 @@ const NetworkCanvas = () => {
         setIsAnimating(false);
         setPacketTrail([]);
         setConnectionGlow(-1);
+        setCurrentNodeAtPacket(toNode.id);
       }
     };
     
@@ -190,10 +231,18 @@ const NetworkCanvas = () => {
   const handleStart = () => {
     setCurrentNodeIndex(0);
     if (nodes.length > 0) {
+      const firstNode = nodes[0];
       setPacketPosition({ 
-        x: nodes[0].x + nodes[0].width / 2, 
-        y: nodes[0].y + nodes[0].height / 2 
+        x: firstNode.x + firstNode.width / 2, 
+        y: firstNode.y + firstNode.height / 2 
       });
+      // Reset packet token to first node's token
+      if (firstNode.token) {
+        setPacketToken(firstNode.token);
+      } else {
+        setPacketToken(null);
+      }
+      setCurrentNodeAtPacket(firstNode.id);
     }
     setPacketTrail([]);
   };
@@ -231,6 +280,9 @@ const NetworkCanvas = () => {
     setPacketTrail([]);
     setIsAnimating(false);
     setConnectionGlow(-1);
+    setPacketToken(null);
+    setNodeTokens({});
+    setCurrentNodeAtPacket(null);
     
     // Load new scenario data
     await loadScenarioData(scenarioId);
@@ -242,6 +294,10 @@ const NetworkCanvas = () => {
         x: firstNode.x + firstNode.width / 2, 
         y: firstNode.y + firstNode.height / 2 
       });
+      if (firstNode.token) {
+        setPacketToken(firstNode.token);
+        setCurrentNodeAtPacket(firstNode.id);
+      }
     }
   };
 
@@ -282,7 +338,7 @@ const NetworkCanvas = () => {
   }
 
   return (
-    <div className="w-full h-screen flex flex-col relative overflow-hidden" style={{ background: 'var(--cyber-darker)' }}>
+    <div className="w-full h-screen flex flex-col overflow-hidden" style={{ background: 'var(--cyber-darker)' }}>
       {/* Animated grid background */}
       <div className="absolute inset-0 bg-grid-pattern bg-dark-gradient opacity-30" />
       
@@ -361,7 +417,11 @@ const NetworkCanvas = () => {
         </div>
       </div>
       
-      <Stage width={dimensions.width} height={dimensions.height}>
+      {/* Main content area with canvas and HUD */}
+      <div className="flex-1 flex relative overflow-hidden">
+        {/* Canvas area */}
+        <div className="flex-1" style={{ minWidth: `${MIN_CANVAS_WIDTH}px` }}>
+          <Stage width={dimensions.width} height={dimensions.height}>
         <Layer>
           {/* Draw Platform boxes */}
           {platformBoxes.map((platformBox) => (
@@ -505,8 +565,8 @@ const NetworkCanvas = () => {
                     <Rect
                       x={node.x + node.width + 10}
                       y={node.y}
-                      width={150}
-                      height={50}
+                      width={200}
+                      height={70}
                       fill="#0a0e27"
                       stroke={nodeColor}
                       strokeWidth={1}
@@ -528,6 +588,15 @@ const NetworkCanvas = () => {
                       fontSize={12}
                       fontFamily="Courier New"
                       fill={isActive ? '#00ff88' : '#e5e7eb'}
+                    />
+                    <Text
+                      x={node.x + node.width + 20}
+                      y={node.y + 46}
+                      text={`Token: ${node.token ? getTokenSummary(node.token) : 'None'}`}
+                      fontSize={10}
+                      fontFamily="Courier New"
+                      fill={nodeColor}
+                      width={180}
                     />
                   </Group>
                 )}
@@ -584,15 +653,29 @@ const NetworkCanvas = () => {
           </Group>
         </Layer>
       </Stage>
+        </div>
+        
+        {/* JWT Token Display HUD */}
+        <div className="flex-shrink-0" style={{ width: '320px' }}>
+          <JwtTokenDisplay 
+            nodeTokens={nodeTokens}
+            packetToken={packetToken}
+            currentNodeId={currentNodeAtPacket}
+          />
+        </div>
+      </div>
       
       {/* Status bar */}
-      <div className="absolute bottom-0 left-0 right-0 p-2" 
+      <div className="relative z-10 p-2" 
            style={{ background: 'linear-gradient(to top, var(--cyber-dark), transparent)' }}>
         <div className="flex items-center justify-between text-xs" style={{ fontFamily: 'monospace' }}>
           <div className="flex items-center gap-4">
             <span style={{ color: 'var(--neon-green)' }}>● CONNECTED</span>
             <span style={{ color: 'var(--neon-blue)' }}>PACKETS: {currentNodeIndex}/{connections.length}</span>
             <span style={{ color: 'var(--neon-purple)' }}>LATENCY: {Math.floor(Math.random() * 50)}ms</span>
+            {packetToken && (
+              <span style={{ color: 'var(--neon-yellow)' }}>JWT: {getTokenSummary(packetToken)}</span>
+            )}
           </div>
           <div style={{ color: 'rgba(0, 212, 255, 0.6)' }}>
             SYSTEM v2.0.1 | SECURE CHANNEL ACTIVE

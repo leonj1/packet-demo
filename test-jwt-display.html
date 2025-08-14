@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWT Token Display Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #040614;
+            color: #00d4ff;
+            padding: 20px;
+        }
+        .test-info {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid #00d4ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        h1 { color: #00ff88; }
+        h2 { color: #b300ff; }
+        .feature { margin: 10px 0; }
+        .check { color: #00ff88; }
+        .link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #00d4ff;
+            color: #040614;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .link:hover {
+            background: #00ff88;
+        }
+    </style>
+</head>
+<body>
+    <h1>JWT Token Display Test</h1>
+    
+    <div class="test-info">
+        <h2>Features Implemented:</h2>
+        <div class="feature"><span class="check">✓</span> JWT token utilities with helper functions</div>
+        <div class="feature"><span class="check">✓</span> JWT Token Display HUD panel component</div>
+        <div class="feature"><span class="check">✓</span> Node JWT tokens in all scenarios</div>
+        <div class="feature"><span class="check">✓</span> Packet JWT token tracking during animation</div>
+        <div class="feature"><span class="check">✓</span> Token exchange during connections</div>
+        <div class="feature"><span class="check">✓</span> Important claims display (issuer, resource, subject, audience, scopes)</div>
+    </div>
+    
+    <div class="test-info">
+        <h2>What to Test:</h2>
+        <div class="feature">1. Open the application and look for the JWT TOKENS panel on the right side</div>
+        <div class="feature">2. Use navigation controls to animate the packet through the network</div>
+        <div class="feature">3. Watch the "Current Packet Token" update as it moves between nodes</div>
+        <div class="feature">4. Observe Node Tokens displayed for each service</div>
+        <div class="feature">5. Check token claims: issuer, subject, audience, resource, and scopes</div>
+        <div class="feature">6. Switch between scenarios to see different token configurations</div>
+        <div class="feature">7. Hover over nodes to see token summary in tooltip</div>
+        <div class="feature">8. Check status bar for packet JWT summary</div>
+    </div>
+    
+    <div class="test-info">
+        <h2>Scenarios with JWT Tokens:</h2>
+        <div class="feature">• Authentication Flow (Default) - Standard OAuth/OIDC flow</div>
+        <div class="feature">• Microservices Authentication - Service mesh with JWT tokens</div>
+        <div class="feature">• Proposal 1 - Complex multi-IdP authentication flow</div>
+    </div>
+    
+    <a href="http://localhost:5173" class="link" target="_blank">Open Application →</a>
+</body>
+</html>
