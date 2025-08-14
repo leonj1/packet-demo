@@ -1,24 +1,196 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Courier New', monospace;
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  
+  /* Neon colors */
+  --neon-blue: #00d4ff;
+  --neon-purple: #b300ff;
+  --neon-pink: #ff00ff;
+  --neon-green: #00ff88;
+  --neon-yellow: #ffff00;
+  --neon-orange: #ff6600;
+  
+  /* Cyber theme colors */
+  --cyber-dark: #0a0e27;
+  --cyber-darker: #040614;
+  --cyber-light: #1a1f3a;
+  --cyber-accent: #00ffcc;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  @apply bg-gray-950 text-gray-100;
+  background: var(--cyber-darker);
+  color: #e5e7eb;
+  overflow: hidden;
 }
 
-button {
-  @apply bg-gray-800 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-colors;
+* {
+  box-sizing: border-box;
+}
+
+/* Background patterns */
+.bg-grid-pattern {
+  background-image: 
+    linear-gradient(rgba(0, 212, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.1) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.bg-dark-gradient {
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 50%, rgba(179, 0, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 50% 100%, rgba(0, 255, 136, 0.1) 0%, transparent 50%);
+}
+
+/* Gradient text */
+.bg-cyber-gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #00d4ff 75%, #00ff88 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cyber-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.5);
+}
+
+/* Range input styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-track {
+  background: var(--cyber-light);
+  height: 4px;
+  border-radius: 9999px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  background: var(--neon-blue);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 212, 255, 0.5);
+  margin-top: -6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: var(--neon-green);
+  border-color: var(--neon-green);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+}
+
+/* Mozilla Firefox */
+input[type="range"]::-moz-range-track {
+  background: var(--cyber-light);
+  height: 4px;
+  border-radius: 9999px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  background: var(--neon-blue);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 212, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* Animations */
+@keyframes scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes glow {
+  0% { box-shadow: 0 0 5px rgba(0, 212, 255, 0.5), 0 0 20px rgba(0, 212, 255, 0.3); }
+  100% { box-shadow: 0 0 20px rgba(0, 212, 255, 0.8), 0 0 40px rgba(0, 212, 255, 0.5); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+/* Utility classes */
+.animate-scan {
+  animation: scan 8s linear infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Glowing text animation */
+@keyframes text-glow {
+  0%, 100% {
+    text-shadow: 0 0 5px currentColor, 0 0 10px currentColor;
+  }
+  50% {
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+  }
+}
+
+/* Button styles */
+.btn-neon {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s;
+}
+
+.btn-neon:hover {
+  transform: scale(1.05);
+}
+
+.btn-neon::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-neon:hover::before {
+  left: 100%;
 }
