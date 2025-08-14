@@ -225,7 +225,7 @@ export const createAuthToken = (issuer, subject, audience, scopes = []) => {
     issuer,
     subject,
     audience,
-    resource: `https://${audience}`,
+    resource: audience, // Use audience directly as resource
     scopes,
     expiresIn: '1h',
     additionalClaims: {

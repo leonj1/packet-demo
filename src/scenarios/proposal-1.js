@@ -156,8 +156,13 @@ export default {
       to: 1,
       tokenExchange: {
         type: 'auth-request',
-        description: 'Browser sends credentials to Okta',
-        token: null // Credentials sent, no token yet
+        description: 'Browser sends credentials to Okta and receives JWT',
+        token: createAuthToken(
+          'okta',
+          'user@example.com',
+          'umbrella',
+          [] // Empty scopes initially
+        )
       }
     },
     { 
@@ -166,7 +171,12 @@ export default {
       tokenExchange: {
         type: 'permission-check',
         description: 'Okta checks user permissions',
-        token: null // Internal check, no token for this
+        token: createAuthToken(
+          'okta',
+          'user@example.com',
+          'umbrella',
+          [] // Still no scopes
+        )
       }
     },
     { 
@@ -174,8 +184,13 @@ export default {
       to: 1,
       tokenExchange: {
         type: 'permission-response',
-        description: 'Permissions confirmed to Okta',
-        token: null // Internal response, no token
+        description: 'Permissions adds scopes and returns to Okta',
+        token: createAuthToken(
+          'okta',
+          'user@example.com',
+          'umbrella',
+          ['read', 'write', 'delete'] // Scopes added by Permissions node
+        )
       }
     },
     { 
@@ -183,12 +198,12 @@ export default {
       to: 0,
       tokenExchange: {
         type: 'auth-response',
-        description: 'Okta issues JWT token to Browser',
+        description: 'Okta returns JWT token with scopes to Browser',
         token: createAuthToken(
           'okta',
           'user@example.com',
-          'platform.com',
-          ['openid', 'profile', 'email', 'platform:access']
+          'umbrella',
+          ['read', 'write', 'delete'] // Scopes from Permissions
         )
       }
     },
@@ -201,8 +216,8 @@ export default {
         token: createAuthToken(
           'okta',
           'user@example.com',
-          'platform.com',
-          ['openid', 'profile', 'email', 'platform:access']
+          'umbrella',
+          ['read', 'write', 'delete']
         )
       }
     },
@@ -215,8 +230,8 @@ export default {
         token: createAuthToken(
           'okta',
           'user@example.com',
-          'platform.com',
-          ['openid', 'profile', 'email', 'platform:access']
+          'umbrella',
+          ['read', 'write', 'delete']
         )
       }
     },
@@ -229,8 +244,8 @@ export default {
         token: createAuthToken(
           'okta',
           'user@example.com',
-          'platform.com',
-          ['openid', 'profile', 'email', 'platform:access']
+          'umbrella',
+          ['read', 'write', 'delete']
         )
       }
     },
@@ -313,8 +328,8 @@ export default {
         token: createAuthToken(
           'okta',
           'user@example.com',
-          'platform.com',
-          ['openid', 'profile', 'email', 'platform:access']
+          'umbrella',
+          ['read', 'write', 'delete']
         )
       }
     },
@@ -327,8 +342,8 @@ export default {
         token: createAuthToken(
           'okta',
           'user@example.com',
-          'platform.com',
-          ['openid', 'profile', 'email', 'platform:access', 'request:complete']
+          'umbrella',
+          ['read', 'write', 'delete', 'request:complete']
         )
       }
     }
