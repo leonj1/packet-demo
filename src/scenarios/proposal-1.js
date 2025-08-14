@@ -102,8 +102,8 @@ export default {
     { 
       id: 'permissions', 
       name: 'Permissions', 
-      x: 500, 
-      y: 500, 
+      x: 100, 
+      y: 100, 
       width: 120, 
       height: 60, 
       icon: 'Shield', 
@@ -154,10 +154,10 @@ export default {
     {
       id: 'authorization-platform',
       name: 'Authorization',
-      x: 470,
-      y: 470,
+      x: 70,
+      y: 70,
       width: 180,
-      height: 100,
+      height: 120,
       color: '#00ff88',
       opacity: 0.3
     }
