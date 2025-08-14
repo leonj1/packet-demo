@@ -24,7 +24,7 @@ const NetworkCanvas = () => {
   const [hoveredNode, setHoveredNode] = useState(null);
   const [animationSpeed, setAnimationSpeed] = useState(1);
   const [connectionGlow, setConnectionGlow] = useState(-1);
-  const [currentScenario, setCurrentScenario] = useState('auth-flow-default');
+  const [currentScenario, setCurrentScenario] = useState('proposal-1');
   const [scenarioData, setScenarioData] = useState(null);
   const [isLoadingScenario, setIsLoadingScenario] = useState(true);
   const [scenarioError, setScenarioError] = useState(null);
