@@ -34,6 +34,15 @@ jobs:
       should_release: ${{ steps.should_release.outputs.value }}
     
     steps:
+      - name: Debug - Initial Repository Check
+        run: |
+          echo "=== Initial Workflow Debug ==="
+          echo "Repository: ${{ github.repository }}"
+          echo "Is this 'leonj1/packet-demo'? (Expected for IAM trust policy)"
+          echo "Repository Owner: ${{ github.repository_owner }}"
+          echo "Run attempt: ${{ github.run_attempt }}"
+          echo "=============================="
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -234,14 +243,46 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
+      - name: Debug - Show GitHub Context
+        run: |
+          echo "=== GitHub Context Debug Information ==="
+          echo "Repository: ${{ github.repository }}"
+          echo "Repository Owner: ${{ github.repository_owner }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Event Name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "SHA: ${{ github.sha }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Run Number: ${{ github.run_number }}"
+          echo "========================================"
+
+      - name: Debug - Show OIDC Token Claims
+        run: |
+          echo "=== OIDC Token Claims ==="
+          echo "Expected OIDC Subject: repo:${{ github.repository }}:ref:${{ github.ref }}"
+          echo "Repository for Trust Policy: repo:${{ github.repository }}:*"
+          echo "========================="
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
+        env:
+          ACTIONS_STEP_DEBUG: true
         with:
           role-to-assume: arn:aws:iam::945513556588:role/github-actions-packet-auth
           aws-region: us-east-1
+          role-session-name: GitHubActions-${{ github.run_id }}
+          audience: sts.amazonaws.com
+
+      - name: Debug - Verify AWS Credentials
+        run: |
+          echo "=== AWS Credentials Verification ==="
+          echo "Attempting to get caller identity..."
+          aws sts get-caller-identity || echo "Failed to get caller identity"
+          echo "===================================="
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -294,11 +335,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Debug - Show GitHub Context (Deploy Job)
+        run: |
+          echo "=== GitHub Context Debug Information (Deploy) ==="
+          echo "Repository: ${{ github.repository }}"
+          echo "Repository Owner: ${{ github.repository_owner }}"
+          echo "Expected OIDC Subject: repo:${{ github.repository }}:ref:${{ github.ref }}"
+          echo "================================================="
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
+        env:
+          ACTIONS_STEP_DEBUG: true
         with:
           role-to-assume: arn:aws:iam::945513556588:role/github-actions-demo
           aws-region: us-east-1
+          role-session-name: GitHubActions-Deploy-${{ github.run_id }}
+          audience: sts.amazonaws.com
 
       - name: Get ECR login token
         id: ecr-login
