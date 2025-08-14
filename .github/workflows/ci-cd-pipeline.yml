@@ -1,0 +1,392 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., 1.0.0, latest)'
+        required: false
+        default: 'latest'
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  packages: write
+  id-token: write
+
+jobs:
+  # ============================================
+  # VERSION MANAGEMENT
+  # ============================================
+  version:
+    name: Calculate Version
+    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[skip version]')"
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.deployment_version.outputs.version }}
+      bump_type: ${{ steps.analyze.outputs.bump_type }}
+      should_release: ${{ steps.should_release.outputs.value }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get last tag
+        id: last_tag
+        if: github.event_name == 'push'
+        run: |
+          # Fetch all tags from remote
+          git fetch --tags
+          
+          # Get the most recent tag from all tags (not just reachable ones)
+          # This prevents issues with orphaned tags
+          LAST_TAG=$(git ls-remote --tags origin | grep -v '{}' | awk -F'/' '{print $3}' | sort -V | tail -1)
+          
+          # Fallback if no tags exist
+          if [ -z "$LAST_TAG" ]; then
+            LAST_TAG="v0.0.0"
+          fi
+          
+          echo "tag=$LAST_TAG" >> $GITHUB_OUTPUT
+          echo "Last tag: $LAST_TAG"
+          
+          # Also show what git describe would return for comparison
+          DESCRIBE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          if [ "$DESCRIBE_TAG" != "$LAST_TAG" ]; then
+            echo "Note: git describe returns $DESCRIBE_TAG but latest remote tag is $LAST_TAG"
+          fi
+
+      - name: Analyze commits
+        id: analyze
+        if: github.event_name == 'push'
+        run: |
+          # Get commits since last tag
+          if [ "${{ steps.last_tag.outputs.tag }}" = "v0.0.0" ]; then
+            COMMITS=$(git log --pretty=format:"%s" --no-merges)
+          else
+            COMMITS=$(git log ${{ steps.last_tag.outputs.tag }}..HEAD --pretty=format:"%s" --no-merges)
+          fi
+          
+          # Initialize bump type
+          BUMP_TYPE="patch"
+          
+          # Check for breaking changes
+          if echo "$COMMITS" | grep -qE "(BREAKING CHANGE|!:)"; then
+            BUMP_TYPE="major"
+          # Check for features
+          elif echo "$COMMITS" | grep -qE "^feat(\(.+\))?:"; then
+            BUMP_TYPE="minor"
+          # Check for fixes
+          elif echo "$COMMITS" | grep -qE "^fix(\(.+\))?:"; then
+            BUMP_TYPE="patch"
+          fi
+          
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "Detected bump type: $BUMP_TYPE"
+
+      - name: Calculate new version
+        id: new_version
+        if: github.event_name == 'push'
+        run: |
+          # Get version from last tag (remove 'v' prefix)
+          LAST_TAG="${{ steps.last_tag.outputs.tag }}"
+          CURRENT_VERSION=${LAST_TAG#v}
+          
+          # Default to 0.0.0 if no tag exists
+          if [ "$LAST_TAG" = "v0.0.0" ]; then
+            CURRENT_VERSION="0.0.0"
+          fi
+          
+          BUMP_TYPE="${{ steps.analyze.outputs.bump_type }}"
+          
+          echo "Current version from tag: $CURRENT_VERSION"
+          
+          # Parse current version
+          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+          
+          # Calculate new version based on bump type
+          case $BUMP_TYPE in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+          esac
+          
+          NEW_VERSION="$major.$minor.$patch"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Set deployment version
+        id: deployment_version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "version=${{ steps.new_version.outputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Should create release
+        id: should_release
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "value=true" >> $GITHUB_OUTPUT
+          else
+            echo "value=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create tag
+        if: github.event_name == 'push'
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # Check if tag already exists
+          TAG_NAME="v${{ steps.new_version.outputs.version }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/${TAG_NAME}$"; then
+            echo "Tag ${TAG_NAME} already exists. Skipping tag creation."
+            echo "::warning::Tag ${TAG_NAME} already exists in remote. This might indicate a version calculation issue."
+          else
+            echo "Creating and pushing tag ${TAG_NAME}"
+            git tag -a "${TAG_NAME}" -m "Release ${TAG_NAME}"
+            git push origin "${TAG_NAME}"
+          fi
+      
+      - name: Export version summary
+        run: |
+          echo "### 📦 Version Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.deployment_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "- **Bump Type**: ${{ steps.analyze.outputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Previous Tag**: ${{ steps.last_tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+
+  # ============================================
+  # CHECK APPLICATION CHANGES
+  # ============================================
+  check-app-changes:
+    name: Check Application Changes
+    needs: version
+    runs-on: ubuntu-latest
+    outputs:
+      app_changed: ${{ steps.check-changes.outputs.app_changed }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for application changes
+        id: check-changes
+        run: |
+          echo "Checking for application changes..."
+          
+          # Safely get the previous commit hash, fallback to empty tree if HEAD^ doesn't exist
+          PREV_COMMIT=$(git rev-parse --quiet HEAD^ 2>/dev/null || echo "4b825dc642cb6eb9a060e54bf8d69288fbee4904")
+          
+          # Check if any application files changed
+          APP_CHANGED="false"
+          if git diff ${PREV_COMMIT} HEAD --name-only 2>/dev/null | grep -v "^\.github/"; then
+            APP_CHANGED="true"
+            echo "Application files changed"
+          fi
+          
+          echo "app_changed=$APP_CHANGED" >> $GITHUB_OUTPUT
+          
+          echo "### 📁 Application Changes Detected" >> $GITHUB_STEP_SUMMARY
+          echo "- **Application Changed**: $APP_CHANGED" >> $GITHUB_STEP_SUMMARY
+
+
+  # ============================================
+  # BUILD AND PUSH APPLICATION IMAGES
+  # ============================================
+  build-and-push:
+    name: Build and Push Docker Image
+    needs: [version, check-app-changes]
+    if: |
+      needs.version.result == 'success' && 
+      needs.check-app-changes.outputs.app_changed == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::945513556588:role/github-actions-demo-auth
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: |
+          echo "Building image with version: ${{ needs.version.outputs.version }}"
+          
+          # Build auth-demo image
+          echo "Building auth-demo image..."
+          docker build \
+            --build-arg VERSION="${{ needs.version.outputs.version }}" \
+            -t auth-demo:latest . || {
+            echo "::error::Failed to build auth-demo image."
+            exit 1
+          }
+
+      - name: Tag and push Docker image to ECR
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+          
+          echo "Tagging and pushing image with version: $VERSION"
+          
+          # Tag and push auth-demo image
+          docker tag auth-demo:latest ${ECR_REGISTRY}/my-app-repository/demo-auth/auth-demo:${VERSION}
+          docker tag auth-demo:latest ${ECR_REGISTRY}/my-app-repository/demo-auth/auth-demo:latest
+          docker push ${ECR_REGISTRY}/my-app-repository/demo-auth/auth-demo:${VERSION}
+          docker push ${ECR_REGISTRY}/my-app-repository/demo-auth/auth-demo:latest
+
+      - name: Build and Push summary
+        run: |
+          echo "### 🏗️ Build & Push Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry**: ${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Built and Pushed**:" >> $GITHUB_STEP_SUMMARY
+          echo "  - auth-demo:${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # DEPLOY TO SERVER
+  # ============================================
+  deploy:
+    name: Deploy to Server
+    needs: [version, build-and-push]
+    if: always() && needs.build-and-push.result == 'success'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::945513556588:role/github-actions-demo-auth
+          aws-region: us-east-1
+
+      - name: Get ECR login token
+        id: ecr-login
+        run: |
+          ECR_TOKEN=$(aws ecr get-login-password --region us-east-1)
+          echo "::add-mask::$ECR_TOKEN"
+          echo "ecr_token=$ECR_TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.TAILSCALE_VM_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      - name: Deploy via Tailscale
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.TAILSCALE_VM_USER }}@${{ secrets.TAILSCALE_VM_HOSTNAME }} << 'ENDSSH'
+            set -e
+            
+            # Variables from GitHub Actions
+            VERSION="${{ needs.version.outputs.version }}"
+            ECR_REGISTRY="${{ needs.build-and-push.outputs.ecr_registry }}"
+            ECR_TOKEN="${{ steps.ecr-login.outputs.ecr_token }}"
+            IMAGE_NAME="${ECR_REGISTRY}/my-app-repository/demo-auth/auth-demo:${VERSION}"
+            
+            echo "=== Starting deployment ==="
+            echo "Version: ${VERSION}"
+            echo "Registry: ${ECR_REGISTRY}"
+            echo "Image: ${IMAGE_NAME}"
+            echo ""
+            
+            # Login to ECR
+            echo "Logging into ECR..."
+            echo "${ECR_TOKEN}" | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+            
+            # Pull new image
+            echo "Pulling new image..."
+            docker pull ${IMAGE_NAME}
+            
+            # Stop and remove existing container
+            echo "Stopping existing container if running..."
+            docker stop auth-demo 2>/dev/null || true
+            docker rm auth-demo 2>/dev/null || true
+            
+            # Run new container
+            echo "Starting new container..."
+            docker run -d \
+              --name auth-demo \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              -e NODE_ENV=production \
+              -e VERSION=${VERSION} \
+              ${IMAGE_NAME}
+            
+            # Wait for container to be healthy
+            echo "Waiting for container to be healthy..."
+            sleep 5
+            
+            # Check container status
+            echo "Container status:"
+            docker ps -a --filter name=auth-demo
+            
+            # Clean up old images
+            echo ""
+            echo "Cleaning up old images..."
+            docker image prune -f
+            
+            # Logout from ECR
+            docker logout ${ECR_REGISTRY}
+            
+            echo ""
+            echo "=== Deployment completed ==="
+            echo "Application URL: http://$(hostname -I | awk '{print $1}'):3000"
+          ENDSSH
+
+      - name: Deploy summary
+        run: |
+          echo "### 🚀 Deployment Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target**: ${{ secrets.TAILSCALE_VM_HOSTNAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: Deployed" >> $GITHUB_STEP_SUMMARY
+
+  # Continue with verify, cleanup, and release jobs as before...
+
