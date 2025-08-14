@@ -240,7 +240,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::945513556588:role/github-actions-demo-auth
+          role-to-assume: arn:aws:iam::945513556588:role/github-actions-packet-auth
           aws-region: us-east-1
 
       - name: Login to Amazon ECR
@@ -251,12 +251,12 @@ jobs:
         run: |
           echo "Building image with version: ${{ needs.version.outputs.version }}"
           
-          # Build auth-demo image
-          echo "Building auth-demo image..."
+          # Build packet-demo image
+          echo "Building packet-demo image..."
           docker build \
             --build-arg VERSION="${{ needs.version.outputs.version }}" \
-            -t auth-demo:latest . || {
-            echo "::error::Failed to build auth-demo image."
+            -t packet-demo:latest . || {
+            echo "::error::Failed to build packet-demo image."
             exit 1
           }
 
@@ -267,11 +267,11 @@ jobs:
           
           echo "Tagging and pushing image with version: $VERSION"
           
-          # Tag and push auth-demo image
-          docker tag auth-demo:latest ${ECR_REGISTRY}/my-app-repository/demo-auth/auth-demo:${VERSION}
-          docker tag auth-demo:latest ${ECR_REGISTRY}/my-app-repository/demo-auth/auth-demo:latest
-          docker push ${ECR_REGISTRY}/my-app-repository/demo-auth/auth-demo:${VERSION}
-          docker push ${ECR_REGISTRY}/my-app-repository/demo-auth/auth-demo:latest
+          # Tag and push packet-demo image
+          docker tag packet-demo:latest ${ECR_REGISTRY}/my-app-repository/demo-auth/packet-demo:${VERSION}
+          docker tag packet-demo:latest ${ECR_REGISTRY}/my-app-repository/demo-auth/packet-demo:latest
+          docker push ${ECR_REGISTRY}/my-app-repository/demo-auth/packet-demo:${VERSION}
+          docker push ${ECR_REGISTRY}/my-app-repository/demo-auth/packet-demo:latest
 
       - name: Build and Push summary
         run: |
@@ -279,7 +279,7 @@ jobs:
           echo "- **Registry**: ${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Version**: ${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Image Built and Pushed**:" >> $GITHUB_STEP_SUMMARY
-          echo "  - auth-demo:${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "  - packet-demo:${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
 
   # ============================================
   # DEPLOY TO SERVER
@@ -329,7 +329,7 @@ jobs:
             VERSION="${{ needs.version.outputs.version }}"
             ECR_REGISTRY="${{ needs.build-and-push.outputs.ecr_registry }}"
             ECR_TOKEN="${{ steps.ecr-login.outputs.ecr_token }}"
-            IMAGE_NAME="${ECR_REGISTRY}/my-app-repository/demo-auth/auth-demo:${VERSION}"
+            IMAGE_NAME="${ECR_REGISTRY}/my-app-repository/demo-auth/packet-demo:${VERSION}"
             
             echo "=== Starting deployment ==="
             echo "Version: ${VERSION}"
@@ -347,13 +347,13 @@ jobs:
             
             # Stop and remove existing container
             echo "Stopping existing container if running..."
-            docker stop auth-demo 2>/dev/null || true
-            docker rm auth-demo 2>/dev/null || true
+            docker stop packet-demo 2>/dev/null || true
+            docker rm packet-demo 2>/dev/null || true
             
             # Run new container
             echo "Starting new container..."
             docker run -d \
-              --name auth-demo \
+              --name packet-demo \
               --restart unless-stopped \
               -p 3000:3000 \
               -e NODE_ENV=production \
@@ -366,7 +366,7 @@ jobs:
             
             # Check container status
             echo "Container status:"
-            docker ps -a --filter name=auth-demo
+            docker ps -a --filter name=packet-demo
             
             # Clean up old images
             echo ""
