@@ -140,6 +140,26 @@ export default {
       height: 110,
       color: '#00d4ff',
       opacity: 0.3
+    },
+    {
+      id: 'authentication-platform',
+      name: 'Authentication',
+      x: 280,
+      y: 70,
+      width: 760,
+      height: 120,
+      color: '#b300ff',
+      opacity: 0.3
+    },
+    {
+      id: 'authorization-platform',
+      name: 'Authorization',
+      x: 470,
+      y: 470,
+      width: 180,
+      height: 100,
+      color: '#00ff88',
+      opacity: 0.3
     }
   ]
 }
