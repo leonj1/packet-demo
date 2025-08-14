@@ -1,5 +1,5 @@
-import React from 'react'
-import { ArrowLeft, ArrowRight, Play, RotateCcw } from 'lucide-react'
+import React, { useState } from 'react'
+import { ArrowLeft, ArrowRight, Play, RotateCcw, ChevronDown } from 'lucide-react'
 
 const NavigationControls = ({
   onStart,
@@ -14,6 +14,22 @@ const NavigationControls = ({
   currentStep,
   totalSteps
 }) => {
+  const [speedDropdownOpen, setSpeedDropdownOpen] = useState(false)
+  
+  const speedOptions = [
+    { value: 0.5, label: '0.5x' },
+    { value: 1, label: '1x' },
+    { value: 1.5, label: '1.5x' },
+    { value: 2, label: '2x' },
+    { value: 2.5, label: '2.5x' },
+    { value: 3, label: '3x' }
+  ]
+  
+  const handleSpeedSelect = (speed) => {
+    onSpeedChange(speed)
+    setSpeedDropdownOpen(false)
+  }
+  
   return (
     <div 
       className="navigation-controls flex items-center gap-3"
@@ -21,25 +37,77 @@ const NavigationControls = ({
       aria-label="navigation controls"
       data-testid="navigation-controls"
     >
-      {/* Speed Control */}
-      <div className="flex items-center gap-2">
-        <label className="text-sm" style={{ color: 'var(--neon-blue)', fontFamily: 'monospace' }}>
+      {/* Speed Control Dropdown */}
+      <div className="relative">
+        <label className="text-xs font-bold tracking-wider mb-1 block" 
+               style={{ color: 'var(--neon-blue)', fontFamily: 'Orbitron, monospace' }}>
           SPEED
         </label>
-        <input
-          type="range"
-          min="0.5"
-          max="3"
-          step="0.5"
-          value={animationSpeed}
-          onChange={(e) => onSpeedChange(parseFloat(e.target.value))}
-          className="w-24"
+        <button
+          className="w-24 px-3 py-2 bg-transparent border-2 rounded-lg text-left flex items-center justify-between
+                     transition-all duration-300 hover:shadow-neon focus:shadow-neon focus:outline-none"
+          style={{
+            borderColor: speedDropdownOpen ? 'var(--neon-blue)' : 'rgba(0, 212, 255, 0.4)',
+            color: 'var(--neon-green)',
+            fontFamily: 'Courier New, monospace',
+            fontSize: '14px',
+            background: speedDropdownOpen ? 'rgba(0, 212, 255, 0.05)' : 'rgba(4, 6, 20, 0.8)'
+          }}
+          onClick={() => setSpeedDropdownOpen(!speedDropdownOpen)}
+          onBlur={() => setTimeout(() => setSpeedDropdownOpen(false), 150)}
           disabled={isAnimating}
           aria-label="Animation speed"
-        />
-        <span className="text-sm" style={{ color: 'var(--neon-green)', fontFamily: 'monospace' }}>
-          {animationSpeed}x
-        </span>
+        >
+          <span className="font-medium">{animationSpeed}x</span>
+          <ChevronDown 
+            className={`w-4 h-4 transition-transform duration-200 ${speedDropdownOpen ? 'rotate-180' : ''}`}
+            style={{ color: 'var(--neon-blue)' }}
+          />
+        </button>
+        
+        {/* Speed Dropdown Options */}
+        {speedDropdownOpen && (
+          <div className="absolute top-full left-0 right-0 mt-1 border-2 rounded-lg z-50 overflow-hidden"
+               style={{
+                 borderColor: 'var(--neon-blue)',
+                 backgroundColor: '#040614',
+                 background: 'linear-gradient(to bottom, #0a0e27, #040614)',
+                 boxShadow: '0 8px 32px rgba(0, 212, 255, 0.3)',
+                 backdropFilter: 'blur(10px)'
+               }}>
+            {speedOptions.map((option) => (
+              <button
+                key={option.value}
+                className="w-full px-3 py-2 text-left transition-all duration-200 text-sm"
+                style={{
+                  color: option.value === animationSpeed ? 'var(--neon-green)' : 'var(--neon-blue)',
+                  fontFamily: 'Courier New, monospace',
+                  backgroundColor: option.value === animationSpeed ? 'rgba(0, 255, 136, 0.1)' : 'transparent',
+                  borderBottom: '1px solid rgba(0, 212, 255, 0.2)'
+                }}
+                onClick={() => handleSpeedSelect(option.value)}
+                onMouseEnter={(e) => {
+                  if (option.value !== animationSpeed) {
+                    e.target.style.backgroundColor = 'rgba(0, 212, 255, 0.1)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (option.value !== animationSpeed) {
+                    e.target.style.backgroundColor = 'transparent'
+                  }
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span>{option.label}</span>
+                  {option.value === animationSpeed && (
+                    <div className="w-2 h-2 rounded-full animate-pulse"
+                         style={{ background: 'var(--neon-green)' }} />
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       
       {/* Initialize Button */}

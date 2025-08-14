@@ -107,17 +107,75 @@ shell:
 		echo "$(RED)Container is not running$(NC)"; \
 	fi
 
-# Development targets
-.PHONY: dev dev-build dev-start
+# Development targets (local npm development)
+.PHONY: dev dev-install dev-build dev-start dev-stop dev-test dev-clean
 
-# Build and start for development
-dev: build start logs
+# Install dependencies for local development
+dev-install:
+	@echo "$(GREEN)Installing npm dependencies...$(NC)"
+	@npm install
+	@echo "$(GREEN)✓ Dependencies installed successfully$(NC)"
 
-# Build without cache (force rebuild)
+# Build the project locally
 dev-build:
-	@echo "$(GREEN)Building Docker image (no cache)...$(NC)"
-	@docker build --no-cache -t $(IMAGE_NAME):$(IMAGE_TAG) .
-	@echo "$(GREEN)✓ Image rebuilt successfully$(NC)"
+	@echo "$(GREEN)Building project locally...$(NC)"
+	@npm run build
+	@echo "$(GREEN)✓ Local build completed successfully$(NC)"
 
-# Start with automatic restart and logs
-dev-start: start logs
+# Start local development server
+dev-start:
+	@echo "$(GREEN)Starting development server...$(NC)"
+	@npm run dev
+
+# Start development server in background
+dev:
+	@echo "$(GREEN)Starting development server...$(NC)"
+	@echo "$(YELLOW)Server running at http://localhost:5173$(NC)"
+	@echo "$(YELLOW)Press Ctrl+C to stop$(NC)"
+	@npm run dev
+
+# Run tests
+dev-test:
+	@echo "$(GREEN)Running tests...$(NC)"
+	@npm test || echo "$(YELLOW)No test script defined$(NC)"
+
+# Clean local development artifacts
+dev-clean:
+	@echo "$(YELLOW)Cleaning local development artifacts...$(NC)"
+	@rm -rf node_modules dist
+	@echo "$(GREEN)✓ Clean complete$(NC)"
+
+# Stop any running dev servers (kills processes on port 5173)
+dev-stop:
+	@echo "$(YELLOW)Stopping development server...$(NC)"
+	@lsof -ti:5173 | xargs kill -9 2>/dev/null || echo "$(GREEN)No dev server running$(NC)"
+	@echo "$(GREEN)✓ Development server stopped$(NC)"
+
+# Full development setup
+dev-setup: dev-install dev
+	@echo "$(GREEN)✓ Development environment ready$(NC)"
+
+# Reinstall dependencies and start fresh
+dev-fresh: dev-clean dev-install dev
+	@echo "$(GREEN)✓ Fresh development environment started$(NC)"
+
+# Check for outdated packages
+dev-outdated:
+	@echo "$(GREEN)Checking for outdated packages...$(NC)"
+	@npm outdated || true
+
+# Update dependencies
+dev-update:
+	@echo "$(GREEN)Updating dependencies...$(NC)"
+	@npm update
+	@echo "$(GREEN)✓ Dependencies updated$(NC)"
+
+# Run linter
+dev-lint:
+	@echo "$(GREEN)Running linter...$(NC)"
+	@npm run lint || echo "$(YELLOW)No lint script defined$(NC)"
+
+# Run preview of production build
+dev-preview:
+	@echo "$(GREEN)Building and previewing production build...$(NC)"
+	@npm run build && npm run preview
