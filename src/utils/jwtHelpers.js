@@ -189,11 +189,59 @@ export const getTokenSummary = (token) => {
   return `${iss} → ${aud} [${scopeStr}]`;
 };
 
+/**
+ * Create a validation request token
+ * @param {Object} token - Token to validate
+ * @param {string} validator - Service that will validate
+ * @returns {Object} Validation request token
+ */
+export const createValidationToken = (token, validator) => {
+  if (!token) return null;
+  
+  return createJwtToken({
+    issuer: validator,
+    subject: 'validation-request',
+    audience: token.payload.iss,
+    resource: 'validation',
+    scopes: ['token:validate'],
+    expiresIn: '5m',
+    additionalClaims: {
+      token_to_validate: token.payload.jti,
+      validation_type: 'introspection'
+    }
+  });
+};
+
+/**
+ * Create an authentication token from credentials
+ * @param {string} issuer - Token issuer (IdP)
+ * @param {string} subject - User or service
+ * @param {string} audience - Intended audience
+ * @param {Array} scopes - Granted scopes
+ * @returns {Object} New authentication token
+ */
+export const createAuthToken = (issuer, subject, audience, scopes = []) => {
+  return createJwtToken({
+    issuer,
+    subject,
+    audience,
+    resource: `https://${audience}`,
+    scopes,
+    expiresIn: '1h',
+    additionalClaims: {
+      auth_time: Math.floor(Date.now() / 1000),
+      auth_method: 'credentials'
+    }
+  });
+};
+
 export default {
   createJwtToken,
   exchangeToken,
   formatTokenForDisplay,
   isTokenExpired,
   getTokenColor,
-  getTokenSummary
+  getTokenSummary,
+  createValidationToken,
+  createAuthToken
 };

@@ -1,78 +1,16 @@
 /**
  * Microservices Authentication Scenario
  * Demonstrates service-to-service authentication in microservices architecture
+ * 
+ * Flow Description:
+ * 1. Mobile app starts with no token
+ * 2. Ingress Gateway authenticates mobile app
+ * 3. Gateway validates and routes requests to services
+ * 4. Services use service tokens for inter-service communication
+ * 5. Services validate tokens before processing requests
  */
 
-import { createJwtToken, exchangeToken } from '../utils/jwtHelpers';
-
-// Create initial tokens for each microservice
-const nodeTokens = {
-  mobile: null, // Mobile app doesn't have a token initially
-  ingress: createJwtToken({
-    issuer: 'api-gateway',
-    subject: 'gateway-service',
-    audience: 'https://microservices.platform.com',
-    resource: 'https://platform.com/api',
-    scopes: ['gateway:route', 'service:discover'],
-    expiresIn: '1h'
-  }),
-  'auth-service': createJwtToken({
-    issuer: 'auth-service',
-    subject: 'auth-service-account',
-    audience: 'https://auth.microservices.com',
-    resource: 'https://platform.com/auth',
-    scopes: ['auth:validate', 'token:issue', 'token:refresh'],
-    expiresIn: '2h'
-  }),
-  'user-service': createJwtToken({
-    issuer: 'auth-service',
-    subject: 'user-service-account',
-    audience: 'https://users.microservices.com',
-    resource: 'https://platform.com/users',
-    scopes: ['user:read', 'user:write', 'profile:manage'],
-    expiresIn: '1h'
-  }),
-  'order-service': createJwtToken({
-    issuer: 'auth-service',
-    subject: 'order-service-account',
-    audience: 'https://orders.microservices.com',
-    resource: 'https://platform.com/orders',
-    scopes: ['order:create', 'order:read', 'order:update'],
-    expiresIn: '1h'
-  }),
-  'payment-service': createJwtToken({
-    issuer: 'auth-service',
-    subject: 'payment-service-account',
-    audience: 'https://payments.microservices.com',
-    resource: 'https://platform.com/payments',
-    scopes: ['payment:process', 'payment:refund', 'payment:read'],
-    expiresIn: '30m'
-  }),
-  'notification-service': createJwtToken({
-    issuer: 'auth-service',
-    subject: 'notification-service-account',
-    audience: 'https://notifications.microservices.com',
-    resource: 'https://platform.com/notifications',
-    scopes: ['notification:send', 'notification:schedule'],
-    expiresIn: '1h'
-  }),
-  'user-db': createJwtToken({
-    issuer: 'user-service',
-    subject: 'user-db-connection',
-    audience: 'https://userdb.microservices.com',
-    resource: 'https://platform.com/databases/users',
-    scopes: ['db:read', 'db:write'],
-    expiresIn: '30m'
-  }),
-  'order-db': createJwtToken({
-    issuer: 'order-service',
-    subject: 'order-db-connection',
-    audience: 'https://orderdb.microservices.com',
-    resource: 'https://platform.com/databases/orders',
-    scopes: ['db:read', 'db:write', 'db:admin'],
-    expiresIn: '30m'
-  })
-};
+import { createAuthToken, exchangeToken } from '../utils/jwtHelpers';
 
 export default {
   id: 'microservices-scenario',
@@ -89,7 +27,7 @@ export default {
       height: 60, 
       icon: 'Globe', 
       color: '#00d4ff',
-      token: nodeTokens.mobile
+      token: null // Mobile app starts with no token
     },
     { 
       id: 'ingress', 
@@ -100,7 +38,7 @@ export default {
       height: 60, 
       icon: 'Shield', 
       color: '#b300ff',
-      token: nodeTokens.ingress
+      token: null // Gateway validates tokens, doesn't hold them
     },
     { 
       id: 'auth-service', 
@@ -111,7 +49,7 @@ export default {
       height: 60, 
       icon: 'Lock', 
       color: '#ff00ff',
-      token: nodeTokens['auth-service']
+      token: null // Auth service issues tokens
     },
     { 
       id: 'user-service', 
@@ -122,7 +60,7 @@ export default {
       height: 60, 
       icon: 'Server', 
       color: '#00ff88',
-      token: nodeTokens['user-service']
+      token: null // Services receive tokens from requests
     },
     { 
       id: 'order-service', 
@@ -133,7 +71,7 @@ export default {
       height: 60, 
       icon: 'Cpu', 
       color: '#ffff00',
-      token: nodeTokens['order-service']
+      token: null // Services receive tokens from requests
     },
     { 
       id: 'payment-service', 
@@ -144,7 +82,7 @@ export default {
       height: 60, 
       icon: 'Shield', 
       color: '#ff6600',
-      token: nodeTokens['payment-service']
+      token: null // Services receive tokens from requests
     },
     { 
       id: 'notification-service', 
@@ -155,7 +93,7 @@ export default {
       height: 60, 
       icon: 'Cloud', 
       color: '#b300ff',
-      token: nodeTokens['notification-service']
+      token: null // Services receive tokens from requests
     },
     { 
       id: 'user-db', 
@@ -166,7 +104,7 @@ export default {
       height: 60, 
       icon: 'Database', 
       color: '#00ff88',
-      token: nodeTokens['user-db']
+      token: null // Databases accessed with service tokens
     },
     { 
       id: 'order-db', 
@@ -177,7 +115,7 @@ export default {
       height: 60, 
       icon: 'Database', 
       color: '#ffff00',
-      token: nodeTokens['order-db']
+      token: null // Databases accessed with service tokens
     }
   ],
 
@@ -187,15 +125,8 @@ export default {
       to: 1,
       tokenExchange: {
         type: 'initial-auth',
-        description: 'Mobile app authenticates with API Gateway',
-        token: createJwtToken({
-          issuer: 'mobile-app',
-          subject: 'user@example.com',
-          audience: 'api-gateway',
-          resource: 'https://platform.com/mobile',
-          scopes: ['mobile:access'],
-          expiresIn: '1h'
-        })
+        description: 'Mobile app sends credentials to API Gateway',
+        token: null // No token yet - sending credentials
       }
     },
     { 
@@ -203,13 +134,8 @@ export default {
       to: 2,
       tokenExchange: {
         type: 'auth-validation',
-        description: 'Gateway validates token with Auth Service',
-        token: exchangeToken(nodeTokens.ingress, {
-          issuer: 'api-gateway',
-          audience: 'auth-service',
-          scopes: ['auth:validate', 'token:verify'],
-          exchangeType: 'validation'
-        })
+        description: 'Gateway requests token from Auth Service',
+        token: null // Internal auth request
       }
     },
     { 
@@ -217,14 +143,13 @@ export default {
       to: 3,
       tokenExchange: {
         type: 'service-call',
-        description: 'Gateway routes to User Service',
-        token: exchangeToken(nodeTokens.ingress, {
-          issuer: 'api-gateway',
-          audience: 'user-service',
-          resource: 'https://platform.com/users',
-          scopes: ['user:read', 'profile:read'],
-          exchangeType: 'service-routing'
-        })
+        description: 'Gateway routes to User Service with auth token',
+        token: createAuthToken(
+          'auth-service',
+          'user@example.com',
+          'user-service',
+          ['user:read', 'profile:read']
+        )
       }
     },
     { 
@@ -232,14 +157,13 @@ export default {
       to: 4,
       tokenExchange: {
         type: 'service-call',
-        description: 'Gateway routes to Order Service',
-        token: exchangeToken(nodeTokens.ingress, {
-          issuer: 'api-gateway',
-          audience: 'order-service',
-          resource: 'https://platform.com/orders',
-          scopes: ['order:create', 'order:read'],
-          exchangeType: 'service-routing'
-        })
+        description: 'Gateway routes to Order Service with auth token',
+        token: createAuthToken(
+          'auth-service',
+          'user@example.com',
+          'order-service',
+          ['order:create', 'order:read']
+        )
       }
     },
     { 
@@ -247,14 +171,17 @@ export default {
       to: 7,
       tokenExchange: {
         type: 'db-access',
-        description: 'User Service accesses User DB',
-        token: exchangeToken(nodeTokens['user-service'], {
-          issuer: 'user-service',
-          audience: 'user-db',
-          resource: 'https://platform.com/databases/users',
-          scopes: ['db:read', 'db:write'],
-          exchangeType: 'database-access'
-        })
+        description: 'User Service accesses User DB with service token',
+        token: exchangeToken(
+          createAuthToken('auth-service', 'user@example.com', 'user-service', []),
+          {
+            issuer: 'user-service',
+            audience: 'user-db',
+            resource: 'https://platform.com/databases/users',
+            scopes: ['db:read', 'db:write'],
+            exchangeType: 'database-access'
+          }
+        )
       }
     },
     { 
@@ -262,14 +189,17 @@ export default {
       to: 5,
       tokenExchange: {
         type: 'payment-processing',
-        description: 'Order Service calls Payment Service',
-        token: exchangeToken(nodeTokens['order-service'], {
-          issuer: 'order-service',
-          audience: 'payment-service',
-          resource: 'https://platform.com/payments',
-          scopes: ['payment:process'],
-          exchangeType: 'payment-request'
-        })
+        description: 'Order Service calls Payment Service with service token',
+        token: exchangeToken(
+          createAuthToken('auth-service', 'user@example.com', 'order-service', []),
+          {
+            issuer: 'order-service',
+            audience: 'payment-service',
+            resource: 'https://platform.com/payments',
+            scopes: ['payment:process'],
+            exchangeType: 'service-to-service'
+          }
+        )
       }
     },
     { 
@@ -278,13 +208,16 @@ export default {
       tokenExchange: {
         type: 'notification',
         description: 'Order Service triggers Notification Service',
-        token: exchangeToken(nodeTokens['order-service'], {
-          issuer: 'order-service',
-          audience: 'notification-service',
-          resource: 'https://platform.com/notifications',
-          scopes: ['notification:send'],
-          exchangeType: 'notification-trigger'
-        })
+        token: exchangeToken(
+          createAuthToken('auth-service', 'user@example.com', 'order-service', []),
+          {
+            issuer: 'order-service',
+            audience: 'notification-service',
+            resource: 'https://platform.com/notifications',
+            scopes: ['notification:send'],
+            exchangeType: 'service-to-service'
+          }
+        )
       }
     },
     { 
@@ -292,14 +225,17 @@ export default {
       to: 8,
       tokenExchange: {
         type: 'db-access',
-        description: 'Order Service accesses Order DB',
-        token: exchangeToken(nodeTokens['order-service'], {
-          issuer: 'order-service',
-          audience: 'order-db',
-          resource: 'https://platform.com/databases/orders',
-          scopes: ['db:read', 'db:write'],
-          exchangeType: 'database-access'
-        })
+        description: 'Order Service accesses Order DB with service token',
+        token: exchangeToken(
+          createAuthToken('auth-service', 'user@example.com', 'order-service', []),
+          {
+            issuer: 'order-service',
+            audience: 'order-db',
+            resource: 'https://platform.com/databases/orders',
+            scopes: ['db:read', 'db:write'],
+            exchangeType: 'database-access'
+          }
+        )
       }
     },
     { 
@@ -308,13 +244,16 @@ export default {
       tokenExchange: {
         type: 'payment-update',
         description: 'Payment Service updates Order DB',
-        token: exchangeToken(nodeTokens['payment-service'], {
-          issuer: 'payment-service',
-          audience: 'order-db',
-          resource: 'https://platform.com/databases/orders',
-          scopes: ['db:write', 'payment:status:update'],
-          exchangeType: 'payment-status-update'
-        })
+        token: exchangeToken(
+          createAuthToken('order-service', 'service', 'payment-service', []),
+          {
+            issuer: 'payment-service',
+            audience: 'order-db',
+            resource: 'https://platform.com/databases/orders',
+            scopes: ['db:write', 'payment:status:update'],
+            exchangeType: 'database-update'
+          }
+        )
       }
     },
     { 
@@ -323,13 +262,16 @@ export default {
       tokenExchange: {
         type: 'user-lookup',
         description: 'Notification Service queries User Service',
-        token: exchangeToken(nodeTokens['notification-service'], {
-          issuer: 'notification-service',
-          audience: 'user-service',
-          resource: 'https://platform.com/users',
-          scopes: ['user:read', 'contact:read'],
-          exchangeType: 'user-query'
-        })
+        token: exchangeToken(
+          createAuthToken('order-service', 'service', 'notification-service', []),
+          {
+            issuer: 'notification-service',
+            audience: 'user-service',
+            resource: 'https://platform.com/users',
+            scopes: ['user:read', 'contact:read'],
+            exchangeType: 'service-to-service'
+          }
+        )
       }
     }
   ],

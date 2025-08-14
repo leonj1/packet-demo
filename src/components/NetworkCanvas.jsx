@@ -66,7 +66,7 @@ const NetworkCanvas = () => {
     loadScenarioData(currentScenario);
   }, []);
 
-  // Update packet position and tokens when scenario data changes
+  // Update packet position when scenario data changes
   useEffect(() => {
     if (scenarioData?.nodes && scenarioData.nodes.length > 0) {
       const firstNode = scenarioData.nodes[0];
@@ -75,7 +75,7 @@ const NetworkCanvas = () => {
         y: firstNode.y + firstNode.height / 2 
       });
       
-      // Initialize node tokens
+      // Initialize node tokens - should all be null now
       const tokens = {};
       scenarioData.nodes.forEach(node => {
         if (node.token) {
@@ -84,11 +84,9 @@ const NetworkCanvas = () => {
       });
       setNodeTokens(tokens);
       
-      // Set initial packet token if first node has one
-      if (firstNode.token) {
-        setPacketToken(firstNode.token);
-        setCurrentNodeAtPacket(firstNode.id);
-      }
+      // Don't set initial packet token from nodes - packet starts with no token
+      setPacketToken(null);
+      setCurrentNodeAtPacket(firstNode.id);
     }
   }, [scenarioData]);
 
@@ -236,12 +234,8 @@ const NetworkCanvas = () => {
         x: firstNode.x + firstNode.width / 2, 
         y: firstNode.y + firstNode.height / 2 
       });
-      // Reset packet token to first node's token
-      if (firstNode.token) {
-        setPacketToken(firstNode.token);
-      } else {
-        setPacketToken(null);
-      }
+      // Reset packet token to null - packet starts with no token
+      setPacketToken(null);
       setCurrentNodeAtPacket(firstNode.id);
     }
     setPacketTrail([]);
@@ -294,10 +288,8 @@ const NetworkCanvas = () => {
         x: firstNode.x + firstNode.width / 2, 
         y: firstNode.y + firstNode.height / 2 
       });
-      if (firstNode.token) {
-        setPacketToken(firstNode.token);
-        setCurrentNodeAtPacket(firstNode.id);
-      }
+      // Don't set packet token from node - packet starts with no token
+      setCurrentNodeAtPacket(firstNode.id);
     }
   };
 

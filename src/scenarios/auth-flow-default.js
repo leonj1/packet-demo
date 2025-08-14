@@ -1,70 +1,17 @@
 /**
  * Default Authentication Flow Scenario
- * Extracted from the original NetworkCanvas hardcoded data
+ * Standard OAuth/OIDC authentication flow through Okta with API access
+ * 
+ * Flow Description:
+ * 1. Browser starts with no token
+ * 2. Browser authenticates with Okta and receives JWT
+ * 3. Okta federates to IdP2 for additional claims
+ * 4. IdP2 checks permissions
+ * 5. NextJS App receives token and makes API calls
+ * 6. APIs validate tokens and access resources
  */
 
-import { createJwtToken, exchangeToken } from '../utils/jwtHelpers';
-
-// Create initial tokens for each node
-const nodeTokens = {
-  browser: null, // Browser doesn't have a token initially
-  okta: createJwtToken({
-    issuer: 'okta',
-    subject: 'user@example.com',
-    audience: 'https://api.platform.com',
-    resource: 'https://platform.com/resources',
-    scopes: ['openid', 'profile', 'email'],
-    expiresIn: '1h'
-  }),
-  idp2: createJwtToken({
-    issuer: 'idp2',
-    subject: 'user@example.com',
-    audience: 'https://idp2.platform.com',
-    resource: 'https://platform.com/idp2/resources',
-    scopes: ['admin', 'read:all', 'write:all'],
-    expiresIn: '2h'
-  }),
-  permissions: createJwtToken({
-    issuer: 'permissions',
-    subject: 'user@example.com',
-    audience: 'https://permissions.platform.com',
-    resource: 'https://platform.com/permissions',
-    scopes: ['permissions:read', 'permissions:write', 'permissions:admin'],
-    expiresIn: '30m'
-  }),
-  nextjs: createJwtToken({
-    issuer: 'nextjs',
-    subject: 'user@example.com',
-    audience: 'https://nextjs.platform.com',
-    resource: 'https://platform.com/app',
-    scopes: ['app:access', 'api:call'],
-    expiresIn: '4h'
-  }),
-  api1: createJwtToken({
-    issuer: 'api1',
-    subject: 'service-account-api1',
-    audience: 'https://api1.platform.com',
-    resource: 'https://platform.com/api/v1',
-    scopes: ['api:read', 'api:write'],
-    expiresIn: '1h'
-  }),
-  api2: createJwtToken({
-    issuer: 'api2',
-    subject: 'service-account-api2',
-    audience: 'https://api2.platform.com',
-    resource: 'https://platform.com/api/v2',
-    scopes: ['api:read', 'api:write', 'db:access'],
-    expiresIn: '1h'
-  }),
-  database: createJwtToken({
-    issuer: 'database',
-    subject: 'db-service',
-    audience: 'https://db.platform.com',
-    resource: 'https://platform.com/database',
-    scopes: ['db:read', 'db:write', 'db:admin'],
-    expiresIn: '30m'
-  })
-};
+import { createAuthToken, exchangeToken } from '../utils/jwtHelpers';
 
 export default {
   id: 'auth-flow-default',
@@ -81,7 +28,7 @@ export default {
       height: 60, 
       icon: 'Globe', 
       color: '#00d4ff',
-      token: nodeTokens.browser
+      token: null // Browser starts with no token
     },
     { 
       id: 'okta', 
@@ -92,7 +39,7 @@ export default {
       height: 60, 
       icon: 'Shield', 
       color: '#b300ff',
-      token: nodeTokens.okta
+      token: null // Okta is an IdP - issues tokens
     },
     { 
       id: 'idp2', 
@@ -103,7 +50,7 @@ export default {
       height: 60, 
       icon: 'Lock', 
       color: '#ff00ff',
-      token: nodeTokens.idp2
+      token: null // IdP2 is an identity provider
     },
     { 
       id: 'permissions', 
@@ -114,7 +61,7 @@ export default {
       height: 60, 
       icon: 'Shield', 
       color: '#00ff88',
-      token: nodeTokens.permissions
+      token: null // Permissions service validates permissions
     },
     { 
       id: 'nextjs', 
@@ -125,7 +72,7 @@ export default {
       height: 60, 
       icon: 'Server', 
       color: '#00d4ff',
-      token: nodeTokens.nextjs
+      token: null // NextJS App receives tokens from requests
     },
     { 
       id: 'api1', 
@@ -136,7 +83,7 @@ export default {
       height: 60, 
       icon: 'Cpu', 
       color: '#ff6600',
-      token: nodeTokens.api1
+      token: null // API 1 receives tokens from requests
     },
     { 
       id: 'api2', 
@@ -147,7 +94,7 @@ export default {
       height: 60, 
       icon: 'Cloud', 
       color: '#ffff00',
-      token: nodeTokens.api2
+      token: null // API 2 receives tokens from requests
     },
     { 
       id: 'database', 
@@ -158,7 +105,7 @@ export default {
       height: 60, 
       icon: 'Database', 
       color: '#00ff88',
-      token: nodeTokens.database
+      token: null // Database receives tokens from services
     }
   ],
 
@@ -167,9 +114,9 @@ export default {
       from: 0, 
       to: 1,
       tokenExchange: {
-        type: 'initial',
+        type: 'auth-request',
         description: 'Browser initiates OAuth flow with Okta',
-        token: null // No token yet
+        token: null // No token yet - sending credentials
       }
     },
     { 
@@ -177,12 +124,8 @@ export default {
       to: 2,
       tokenExchange: {
         type: 'federation',
-        description: 'Okta federates to IdP2',
-        token: exchangeToken(nodeTokens.okta, {
-          issuer: 'okta',
-          audience: 'idp2',
-          exchangeType: 'federation'
-        })
+        description: 'Okta federates to IdP2 for additional claims',
+        token: null // Internal federation - no packet token
       }
     },
     { 
@@ -191,27 +134,21 @@ export default {
       tokenExchange: {
         type: 'permission-check',
         description: 'IdP2 validates permissions',
-        token: exchangeToken(nodeTokens.idp2, {
-          issuer: 'idp2',
-          audience: 'permissions',
-          scopes: ['permissions:read', 'permissions:validate'],
-          exchangeType: 'permission-validation'
-        })
+        token: null // Internal check - no packet token
       }
     },
     { 
       from: 1, 
       to: 4,
       tokenExchange: {
-        type: 'app-auth',
+        type: 'auth-response',
         description: 'Okta provides token to NextJS App',
-        token: exchangeToken(nodeTokens.okta, {
-          issuer: 'okta',
-          audience: 'nextjs-app',
-          resource: 'https://platform.com/app',
-          scopes: ['app:access', 'api:call', 'user:profile'],
-          exchangeType: 'app-authentication'
-        })
+        token: createAuthToken(
+          'okta',
+          'user@example.com',
+          'nextjs-app',
+          ['app:access', 'api:call', 'user:profile']
+        )
       }
     },
     { 
@@ -219,14 +156,13 @@ export default {
       to: 5,
       tokenExchange: {
         type: 'api-call',
-        description: 'NextJS App calls API 1',
-        token: exchangeToken(nodeTokens.nextjs, {
-          issuer: 'nextjs',
-          audience: 'api1',
-          resource: 'https://platform.com/api/v1',
-          scopes: ['api:read', 'api:write'],
-          exchangeType: 'service-to-service'
-        })
+        description: 'NextJS App calls API 1 with Okta token',
+        token: createAuthToken(
+          'okta',
+          'user@example.com',
+          'api1',
+          ['api:read', 'api:write']
+        )
       }
     },
     { 
@@ -234,14 +170,17 @@ export default {
       to: 6,
       tokenExchange: {
         type: 'api-chain',
-        description: 'API 1 calls API 2',
-        token: exchangeToken(nodeTokens.api1, {
-          issuer: 'api1',
-          audience: 'api2',
-          resource: 'https://platform.com/api/v2',
-          scopes: ['api:read', 'api:write', 'db:access'],
-          exchangeType: 'api-chaining'
-        })
+        description: 'API 1 calls API 2 with service token',
+        token: exchangeToken(
+          createAuthToken('okta', 'user@example.com', 'api1', []),
+          {
+            issuer: 'api1',
+            audience: 'api2',
+            resource: 'https://platform.com/api/v2',
+            scopes: ['api:read', 'api:write', 'db:access'],
+            exchangeType: 'service-to-service'
+          }
+        )
       }
     },
     { 
@@ -249,14 +188,17 @@ export default {
       to: 7,
       tokenExchange: {
         type: 'db-access',
-        description: 'API 2 accesses Database',
-        token: exchangeToken(nodeTokens.api2, {
-          issuer: 'api2',
-          audience: 'database',
-          resource: 'https://platform.com/database',
-          scopes: ['db:read', 'db:write'],
-          exchangeType: 'database-access'
-        })
+        description: 'API 2 accesses Database with DB token',
+        token: exchangeToken(
+          createAuthToken('api1', 'service', 'api2', []),
+          {
+            issuer: 'api2',
+            audience: 'database',
+            resource: 'https://platform.com/database',
+            scopes: ['db:read', 'db:write'],
+            exchangeType: 'database-access'
+          }
+        )
       }
     },
     { 
@@ -265,13 +207,16 @@ export default {
       tokenExchange: {
         type: 'permission-enforcement',
         description: 'Permissions service enforces access to Database',
-        token: exchangeToken(nodeTokens.permissions, {
-          issuer: 'permissions',
-          audience: 'database',
-          resource: 'https://platform.com/database',
-          scopes: ['db:admin', 'permissions:enforce'],
-          exchangeType: 'permission-enforcement'
-        })
+        token: exchangeToken(
+          createAuthToken('okta', 'user@example.com', 'permissions', []),
+          {
+            issuer: 'permissions',
+            audience: 'database',
+            resource: 'https://platform.com/database',
+            scopes: ['db:admin', 'permissions:enforce'],
+            exchangeType: 'permission-enforcement'
+          }
+        )
       }
     }
   ],
