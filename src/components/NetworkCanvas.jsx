@@ -2,6 +2,9 @@ import React from 'react';
 import { Stage, Layer, Rect, Text, Line, Circle, Group } from 'react-konva';
 import { useState, useEffect } from 'react';
 import { Zap, Shield, Globe, Database, Server, Cloud, Lock, Cpu } from 'lucide-react';
+import ScenarioSelector from './ScenarioSelector';
+import NavigationControls from './NavigationControls';
+import { loadScenario } from '../utils/scenarioLoader';
 
 const NetworkCanvas = () => {
   const [dimensions, setDimensions] = useState({
@@ -16,28 +19,27 @@ const NetworkCanvas = () => {
   const [hoveredNode, setHoveredNode] = useState(null);
   const [animationSpeed, setAnimationSpeed] = useState(1);
   const [connectionGlow, setConnectionGlow] = useState(-1);
+  const [currentScenario, setCurrentScenario] = useState('auth-flow-default');
+  const [scenarioData, setScenarioData] = useState(null);
+  const [isLoadingScenario, setIsLoadingScenario] = useState(true);
+  const [scenarioError, setScenarioError] = useState(null);
 
-  const nodes = [
-    { id: 'browser', name: 'Browser', x: 150, y: 200, width: 120, height: 60, icon: Globe, color: '#00d4ff' },
-    { id: 'okta', name: 'Okta', x: 350, y: 100, width: 120, height: 60, icon: Shield, color: '#b300ff' },
-    { id: 'idp2', name: 'IdP2', x: 550, y: 100, width: 120, height: 60, icon: Lock, color: '#ff00ff' },
-    { id: 'permissions', name: 'Permissions', x: 750, y: 200, width: 120, height: 60, icon: Shield, color: '#00ff88' },
-    { id: 'nextjs', name: 'NextJS App', x: 350, y: 300, width: 120, height: 60, icon: Server, color: '#00d4ff' },
-    { id: 'api1', name: 'API 1', x: 550, y: 400, width: 120, height: 60, icon: Cpu, color: '#ff6600' },
-    { id: 'api2', name: 'API 2', x: 750, y: 400, width: 120, height: 60, icon: Cloud, color: '#ffff00' },
-    { id: 'database', name: 'Database', x: 950, y: 300, width: 120, height: 60, icon: Database, color: '#00ff88' }
-  ];
+  // Icon mapping for scenarios
+  const iconMap = {
+    'Globe': Globe,
+    'Shield': Shield,
+    'Lock': Lock,
+    'Server': Server,
+    'Cpu': Cpu,
+    'Cloud': Cloud,
+    'Database': Database,
+    'Zap': Zap
+  };
 
-  const connections = [
-    { from: 0, to: 1 },
-    { from: 1, to: 2 },
-    { from: 2, to: 3 },
-    { from: 1, to: 4 },
-    { from: 4, to: 5 },
-    { from: 5, to: 6 },
-    { from: 6, to: 7 },
-    { from: 3, to: 7 }
-  ];
+  // Get current scenario data
+  const nodes = scenarioData?.nodes || [];
+  const connections = scenarioData?.connections || [];
+  const platformBoxes = scenarioData?.platformBoxes || [];
 
   useEffect(() => {
     const handleResize = () => {
@@ -50,6 +52,36 @@ const NetworkCanvas = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Load initial scenario
+  useEffect(() => {
+    loadScenarioData(currentScenario);
+  }, []);
+
+  // Update packet position when scenario data changes
+  useEffect(() => {
+    if (scenarioData?.nodes && scenarioData.nodes.length > 0) {
+      const firstNode = scenarioData.nodes[0];
+      setPacketPosition({ 
+        x: firstNode.x + firstNode.width / 2, 
+        y: firstNode.y + firstNode.height / 2 
+      });
+    }
+  }, [scenarioData]);
+
+  const loadScenarioData = async (scenarioId) => {
+    try {
+      setIsLoadingScenario(true);
+      setScenarioError(null);
+      const data = await loadScenario(scenarioId);
+      setScenarioData(data);
+    } catch (error) {
+      console.error('Failed to load scenario data:', error);
+      setScenarioError(error.message);
+    } finally {
+      setIsLoadingScenario(false);
+    }
+  };
 
   const animatePacket = (fromNode, toNode, connectionIndex) => {
     const steps = Math.floor(30 / animationSpeed);
@@ -92,40 +124,162 @@ const NetworkCanvas = () => {
     animate();
   };
 
+  const animatePacketBackward = (fromNode, toNode, connectionIndex) => {
+    const steps = Math.floor(30 / animationSpeed);
+    let step = 0;
+    const trail = [];
+    
+    setConnectionGlow(connectionIndex);
+    
+    const animate = () => {
+      if (step <= steps) {
+        const progress = step / steps;
+        const easeProgress = easeInOutCubic(progress);
+        const x = fromNode.x + (toNode.x - fromNode.x) * easeProgress + fromNode.width / 2;
+        const y = fromNode.y + (toNode.y - fromNode.y) * easeProgress + fromNode.height / 2;
+        
+        setPacketPosition({ x, y });
+        
+        // Add to trail (for backward animation, we reverse the trail effect)
+        if (step % 2 === 0) {
+          trail.unshift({ x, y, opacity: 1 });
+          if (trail.length > 5) trail.pop();
+          setPacketTrail([...trail]);
+        }
+        
+        // Fade trail
+        trail.forEach((point, i) => {
+          point.opacity = (trail.length - i) / trail.length * 0.6;
+        });
+        
+        step++;
+        requestAnimationFrame(animate);
+      } else {
+        setIsAnimating(false);
+        setPacketTrail([]);
+        setConnectionGlow(-1);
+      }
+    };
+    
+    setIsAnimating(true);
+    animate();
+  };
+
   const easeInOutCubic = (t) => {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   };
 
   const handleNext = () => {
-    if (currentNodeIndex < connections.length - 1 && !isAnimating) {
+    if (currentNodeIndex < connections.length && !isAnimating) {
       const connection = connections[currentNodeIndex];
       animatePacket(nodes[connection.from], nodes[connection.to], currentNodeIndex);
       setCurrentNodeIndex(currentNodeIndex + 1);
     }
   };
 
+  const handlePrevious = () => {
+    if (currentNodeIndex > 0 && !isAnimating) {
+      const prevConnectionIndex = currentNodeIndex - 1;
+      const connection = connections[prevConnectionIndex];
+      // Animate backward from current position to previous node
+      animatePacketBackward(nodes[connection.to], nodes[connection.from], prevConnectionIndex);
+      setCurrentNodeIndex(currentNodeIndex - 1);
+    }
+  };
+
   const handleStart = () => {
     setCurrentNodeIndex(0);
-    setPacketPosition({ 
-      x: nodes[0].x + nodes[0].width / 2, 
-      y: nodes[0].y + nodes[0].height / 2 
-    });
+    if (nodes.length > 0) {
+      setPacketPosition({ 
+        x: nodes[0].x + nodes[0].width / 2, 
+        y: nodes[0].y + nodes[0].height / 2 
+      });
+    }
     setPacketTrail([]);
   };
 
   const handleAutoPlay = () => {
+    if (connections.length === 0) {
+      console.warn('No connections available for auto-play');
+      return;
+    }
+    
     handleStart();
     let index = 0;
     const playNext = () => {
-      if (index < connections.length) {
+      if (index < connections.length && !isAnimating) {
         const connection = connections[index];
-        animatePacket(nodes[connection.from], nodes[connection.to], index);
-        index++;
-        setTimeout(playNext, 1500 / animationSpeed);
+        if (nodes[connection.from] && nodes[connection.to]) {
+          animatePacket(nodes[connection.from], nodes[connection.to], index);
+          setCurrentNodeIndex(index + 1);
+          index++;
+          setTimeout(playNext, 1500 / animationSpeed);
+        } else {
+          console.error('Invalid connection nodes at index', index);
+        }
       }
     };
     setTimeout(playNext, 100);
   };
+
+  const handleScenarioChange = async (scenarioId) => {
+    console.log('Scenario changed to:', scenarioId);
+    setCurrentScenario(scenarioId);
+    
+    // Reset animation state when changing scenarios
+    setCurrentNodeIndex(0);
+    setPacketTrail([]);
+    setIsAnimating(false);
+    setConnectionGlow(-1);
+    
+    // Load new scenario data
+    await loadScenarioData(scenarioId);
+    
+    // Reset packet position to first node of new scenario
+    if (scenarioData?.nodes && scenarioData.nodes.length > 0) {
+      const firstNode = scenarioData.nodes[0];
+      setPacketPosition({ 
+        x: firstNode.x + firstNode.width / 2, 
+        y: firstNode.y + firstNode.height / 2 
+      });
+    }
+  };
+
+  // Show loading state
+  if (isLoadingScenario) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center" style={{ background: 'var(--cyber-darker)' }}>
+        <div className="text-center">
+          <div className="animate-pulse text-xl mb-4" style={{ color: 'var(--neon-blue)', fontFamily: 'Orbitron, sans-serif' }}>
+            LOADING SCENARIO...
+          </div>
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (scenarioError) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center" style={{ background: 'var(--cyber-darker)' }}>
+        <div className="text-center">
+          <div className="text-xl mb-4" style={{ color: 'var(--neon-red, #ff4444)', fontFamily: 'Orbitron, sans-serif' }}>
+            SCENARIO LOAD ERROR
+          </div>
+          <div className="text-sm" style={{ color: 'var(--neon-blue)', fontFamily: 'monospace' }}>
+            {scenarioError}
+          </div>
+          <button 
+            onClick={() => loadScenarioData(currentScenario)}
+            className="mt-4 px-6 py-2 border border-blue-500 text-blue-500 rounded hover:bg-blue-500 hover:text-black transition-colors"
+          >
+            RETRY
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-screen flex flex-col relative overflow-hidden" style={{ background: 'var(--cyber-darker)' }}>
@@ -156,66 +310,31 @@ const NetworkCanvas = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 mr-4">
-              <label className="text-sm" style={{ color: 'var(--neon-blue)', fontFamily: 'monospace' }}>SPEED</label>
-              <input
-                type="range"
-                min="0.5"
-                max="3"
-                step="0.5"
-                value={animationSpeed}
-                onChange={(e) => setAnimationSpeed(parseFloat(e.target.value))}
-                className="w-24"
-              />
-              <span className="text-sm" style={{ color: 'var(--neon-green)', fontFamily: 'monospace' }}>{animationSpeed}x</span>
-            </div>
+          <div className="flex items-center gap-6">
+            {/* Scenario Selector */}
+            <ScenarioSelector 
+              onScenarioChange={handleScenarioChange}
+              currentScenario={currentScenario}
+            />
             
-            <button 
-              onClick={handleStart}
-              className="btn-neon relative px-6 py-2 text-black font-bold rounded-lg border transition-all duration-300"
-              style={{ 
-                background: 'linear-gradient(to right, var(--neon-green), var(--neon-blue))',
-                borderColor: 'rgba(0, 255, 136, 0.5)'
-              }}
-              onMouseEnter={(e) => e.target.style.boxShadow = '0 0 30px rgba(0, 255, 136, 0.5)'}
-              onMouseLeave={(e) => e.target.style.boxShadow = 'none'}
-            >
-              <span className="relative z-10">INITIALIZE</span>
-            </button>
-            
-            <button 
-              onClick={handleNext}
-              disabled={isAnimating || currentNodeIndex >= connections.length - 1}
-              className="btn-neon relative px-6 py-2 text-white font-bold rounded-lg border transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ 
-                background: 'linear-gradient(to right, var(--neon-blue), var(--neon-purple))',
-                borderColor: 'rgba(0, 212, 255, 0.5)'
-              }}
-              onMouseEnter={(e) => !e.target.disabled && (e.target.style.boxShadow = '0 0 30px rgba(0, 212, 255, 0.5)')}
-              onMouseLeave={(e) => e.target.style.boxShadow = 'none'}
-            >
-              <span className="relative z-10">TRANSMIT →</span>
-            </button>
-            
-            <button 
-              onClick={handleAutoPlay}
-              disabled={isAnimating}
-              className="btn-neon relative px-6 py-2 text-white font-bold rounded-lg border transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ 
-                background: 'linear-gradient(to right, var(--neon-purple), var(--neon-pink))',
-                borderColor: 'rgba(179, 0, 255, 0.5)'
-              }}
-              onMouseEnter={(e) => !e.target.disabled && (e.target.style.boxShadow = '0 0 30px rgba(179, 0, 255, 0.5)')}
-              onMouseLeave={(e) => e.target.style.boxShadow = 'none'}
-            >
-              <span className="relative z-10">▶ AUTO</span>
-            </button>
+            <NavigationControls
+              onStart={handleStart}
+              onNext={handleNext}
+              onPrevious={handlePrevious}
+              onAutoPlay={handleAutoPlay}
+              canGoNext={currentNodeIndex < connections.length}
+              canGoPrevious={currentNodeIndex > 0}
+              isAnimating={isAnimating}
+              animationSpeed={animationSpeed}
+              onSpeedChange={setAnimationSpeed}
+              currentStep={currentNodeIndex}
+              totalSteps={connections.length}
+            />
           </div>
         </div>
         
         {/* Progress indicator */}
-        <div className="mt-3 h-1 rounded-full overflow-hidden" style={{ background: 'var(--cyber-light)' }}>
+        <div className="mt-3 h-1 rounded-full overflow-hidden relative" style={{ background: 'var(--cyber-light)' }}>
           <div 
             className="h-full transition-all duration-500"
             style={{ 
@@ -223,11 +342,67 @@ const NetworkCanvas = () => {
               background: 'linear-gradient(to right, var(--neon-green), var(--neon-blue), var(--neon-purple))'
             }}
           />
+          {/* Progress steps indicator */}
+          <div className="absolute top-0 left-0 right-0 h-full flex">
+            {connections.map((_, index) => (
+              <div
+                key={index}
+                className="flex-1 border-r border-gray-600 last:border-r-0 relative"
+              >
+                {index < currentNodeIndex && (
+                  <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-green-500 to-blue-500 opacity-80" />
+                )}
+                {index === currentNodeIndex - 1 && isAnimating && (
+                  <div className="absolute top-0 left-0 w-full h-full bg-yellow-400 animate-pulse" />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       
       <Stage width={dimensions.width} height={dimensions.height}>
         <Layer>
+          {/* Draw Platform boxes */}
+          {platformBoxes.map((platformBox) => (
+            <Group key={platformBox.id}>
+              {/* Platform box */}
+              <Rect
+                x={platformBox.x}
+                y={platformBox.y}
+                width={platformBox.width}
+                height={platformBox.height}
+                fill="transparent"
+                stroke={platformBox.color}
+                strokeWidth={1}
+                cornerRadius={4}
+                opacity={platformBox.opacity}
+                dash={[5, 5]}
+              />
+              
+              {/* Platform label background */}
+              <Rect
+                x={platformBox.x + platformBox.width / 2 - platformBox.name.length * 3}
+                y={platformBox.y - 12}
+                width={platformBox.name.length * 6}
+                height={16}
+                fill="#040614"
+                cornerRadius={2}
+              />
+              
+              {/* Platform label */}
+              <Text
+                x={platformBox.x + platformBox.width / 2 - platformBox.name.length * 3 + 5}
+                y={platformBox.y - 10}
+                text={platformBox.name}
+                fontSize={12}
+                fontFamily="Courier New"
+                fill={platformBox.color}
+                opacity={0.7}
+              />
+            </Group>
+          ))}
+          
           {/* Draw connections with glow effect */}
           {connections.map((conn, index) => {
             const fromNode = nodes[conn.from];
