@@ -115,20 +115,24 @@ const ScenarioSelector = ({ onScenarioChange, currentScenario }) => {
 
         {/* Dropdown Options */}
         {isOpen && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-black border-2 rounded-lg z-50 overflow-hidden"
+          <div className="absolute top-full left-0 right-0 mt-1 border-2 rounded-lg z-50 overflow-hidden"
                style={{
                  borderColor: 'var(--neon-blue)',
-                 background: 'rgba(4, 6, 20, 0.95)',
-                 boxShadow: '0 8px 32px rgba(0, 212, 255, 0.3)'
+                 backgroundColor: '#040614',
+                 background: 'linear-gradient(to bottom, #0a0e27, #040614)',
+                 boxShadow: '0 8px 32px rgba(0, 212, 255, 0.3)',
+                 backdropFilter: 'blur(10px)'
                }}>
             {scenarios.map((scenario) => (
               <button
                 key={scenario.id}
-                className="w-full px-4 py-3 text-left hover:bg-blue-900/30 transition-colors duration-200 
-                           border-b border-blue-900/20 last:border-b-0 group"
+                className="w-full px-4 py-3 text-left transition-all duration-200 
+                           border-b last:border-b-0 group"
                 style={{
                   color: scenario.id === currentScenario ? 'var(--neon-green)' : 'var(--neon-blue)',
-                  fontFamily: 'Courier New, monospace'
+                  fontFamily: 'Courier New, monospace',
+                  backgroundColor: hoveredScenario === scenario.id ? 'rgba(0, 212, 255, 0.1)' : 'transparent',
+                  borderBottomColor: 'rgba(0, 212, 255, 0.2)'
                 }}
                 onClick={() => handleScenarioChange(scenario.id)}
                 onMouseEnter={() => setHoveredScenario(scenario.id)}
