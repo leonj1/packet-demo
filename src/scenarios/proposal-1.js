@@ -223,6 +223,34 @@ export default {
     },
     { 
       from: 5, 
+      to: 1,
+      tokenExchange: {
+        type: 'token-validation',
+        description: 'Umbrella validates token with Okta',
+        token: createAuthToken(
+          'okta',
+          'user@example.com',
+          'umbrella',
+          ['read', 'write', 'delete']
+        )
+      }
+    },
+    { 
+      from: 1, 
+      to: 5,
+      tokenExchange: {
+        type: 'validation-response',
+        description: 'Okta confirms token is valid',
+        token: createAuthToken(
+          'okta',
+          'user@example.com',
+          'umbrella',
+          ['read', 'write', 'delete']
+        )
+      }
+    },
+    { 
+      from: 5, 
       to: 6,
       tokenExchange: {
         type: 'forward-request',
