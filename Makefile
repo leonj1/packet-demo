@@ -40,10 +40,6 @@ build:
 # Start container
 start:
 	@echo "$(GREEN)Starting container...$(NC)"
-	@if docker ps -a --format '{{.Names}}' | grep -q '^$(CONTAINER_NAME)$$'; then \
-		echo "$(YELLOW)Container already exists, removing...$(NC)"; \
-		docker rm -f $(CONTAINER_NAME) > /dev/null 2>&1; \
-	fi
 	@docker run -d \
 		--name $(CONTAINER_NAME) \
 		-p $(HOST_PORT):$(PORT) \
@@ -55,12 +51,8 @@ start:
 # Stop container
 stop:
 	@echo "$(YELLOW)Stopping container...$(NC)"
-	@if docker ps --format '{{.Names}}' | grep -q '^$(CONTAINER_NAME)$$'; then \
-		docker stop $(CONTAINER_NAME); \
-		echo "$(GREEN)✓ Container stopped$(NC)"; \
-	else \
-		echo "$(RED)Container is not running$(NC)"; \
-	fi
+	docker stop -t 0 $(CONTAINER_NAME) || true
+	docker rm -f $(CONTAINER_NAME) || true
 
 # Restart container (stop + start)
 restart: stop start
