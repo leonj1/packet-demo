@@ -210,7 +210,8 @@ export async function getAvailableScenarios() {
   const knownScenarios = [
     'auth-flow-default',
     'multi-cloud-scenario',
-    'microservices-scenario'
+    'microservices-scenario',
+    'proposal-1'
   ]
 
   const scenarios = []
