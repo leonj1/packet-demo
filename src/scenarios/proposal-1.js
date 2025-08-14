@@ -268,17 +268,11 @@ export default {
       tokenExchange: {
         type: 'token-validation',
         description: 'RE-Port API validates token with IdP',
-        token: createValidationToken(
-          exchangeToken(
-            createAuthToken('okta', 'user@example.com', 'platform.com', []),
-            {
-              issuer: 'idp',
-              audience: 're-port-api',
-              scopes: ['api:read', 'api:write'],
-              exchangeType: 'validation-request'
-            }
-          ),
-          're-port-api'
+        token: createAuthToken(
+          'idp',
+          'user@example.com',
+          're-port-api',
+          ['re-port-api:read', 're-port-api:write']
         )
       }
     },
