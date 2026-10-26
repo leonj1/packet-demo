@@ -27,7 +27,7 @@ jobs:
   version:
     name: Calculate Version
     if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[skip version]')"
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     outputs:
       version: ${{ steps.deployment_version.outputs.version }}
       bump_type: ${{ steps.analyze.outputs.bump_type }}
@@ -193,7 +193,7 @@ jobs:
   check-app-changes:
     name: Check Application Changes
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     outputs:
       app_changed: ${{ steps.check-changes.outputs.app_changed }}
       
@@ -233,7 +233,7 @@ jobs:
     if: |
       needs.version.result == 'success' && 
       needs.check-app-changes.outputs.app_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     outputs:
       ecr_registry: ${{ steps.login-ecr.outputs.registry }}
       
@@ -329,7 +329,7 @@ jobs:
     name: Deploy to Server
     needs: [version, build-and-push]
     if: always() && needs.build-and-push.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     
     steps:
       - name: Checkout code
